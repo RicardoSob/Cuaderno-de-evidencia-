@@ -1,8 +1,17 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from tkinter import ttk, scrolledtext, messagebox
 from PIL import Image, ImageTk
 import webbrowser
-
+import threading
+import queue
+import time
+import random
+from io import StringIO
+"""
+from networkx import nx
+import graphviz import Digraph
+import os
+"""
 class CuadernoEvidencias:
     def __init__(self, root):
         self.root = root
@@ -24,6 +33,8 @@ class CuadernoEvidencias:
         self.ventana_contenedores = None
         self.ventana_pilas_colas = None
         self.ventana_rec_grafos = None
+        self.ventana_arboles_binarios=None
+        self.ventana_comcurrencia=None
         
         # Configurar el evento para cambiar de pestaña
         self.notebook_principal.bind("<<NotebookTabChanged>>", self.cambio_pestana)
@@ -93,7 +104,7 @@ class CuadernoEvidencias:
         btn_arboles.pack(pady=20)
 
         btn_concurrencia = tk.Button(frame_tercero, text="Concurrencia",
-                            
+                            command=self.ejecutar_concurrencia,
                             font=('Arial', 12), bg='Red')
         btn_concurrencia.pack(pady=20)
     
@@ -829,13 +840,13 @@ En este programa aplicamos el diccionario para que almacene datos ingresados por
         frame = tk.Frame(ventana)
         frame.pack(fill='both', expand=True, padx=20, pady=20)
         
-        label = tk.Label(frame, text="Ejecutando Sistema de Temperaturas", font=('Arial', 14))
+        label = tk.Label(frame, text="Sistema de Temperaturas", font=('Arial', 14))
         label.pack(pady=10)
         
         output = scrolledtext.ScrolledText(frame, wrap=tk.WORD, width=80, height=25)
         output.pack(fill='both', expand=True)
         
-        # Crear frame para entrada de datos
+        # Frame para entrada de datos
         input_frame = tk.Frame(frame)
         input_frame.pack(fill='x', pady=10)
         
@@ -845,22 +856,121 @@ En este programa aplicamos el diccionario para que almacene datos ingresados por
         entry_opcion = tk.Entry(input_frame, width=10)
         entry_opcion.pack(side='left', padx=5)
         
-        btn_enviar = tk.Button(input_frame, text="Enviar", command=lambda: self.procesar_opcion_temperaturas(entry_opcion, output))
+        btn_enviar = tk.Button(input_frame, text="Enviar", 
+                            command=lambda: self.procesar_opcion_temperaturas(entry_opcion, output))
         btn_enviar.pack(side='left')
         
         # Variables para almacenar datos
-        self.temperaturas_app = None
+        self.temperaturas = []
+        self.dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
         
         # Mostrar menú inicial
         output.insert(tk.END, "\nMenú de Opciones:")
-        output.insert(tk.END, "\n1. Almacenar temperaturas")
-        output.insert(tk.END, "\n2. Identificar las temperaturas únicas")
-        output.insert(tk.END, "\n3. Crear diccionario de temperaturas")
+        output.insert(tk.END, "\n1. Almacenar temperaturas para la semana")
+        output.insert(tk.END, "\n2. Mostrar temperaturas almacenadas")
+        output.insert(tk.END, "\n3. Identificar las temperaturas únicas")
+        output.insert(tk.END, "\n4. Crear diccionario de temperaturas")
+        output.insert(tk.END, "\n5. Mostrar temperatura máxima y mínima")
         output.insert(tk.END, "\n0. Salir\n")
         output.config(state='disabled')
         
         btn_cerrar = tk.Button(frame, text="Cerrar", command=ventana.destroy)
         btn_cerrar.pack(pady=10)
+
+    def procesar_opcion_temperaturas(self, entry_opcion, output):
+        opcion = entry_opcion.get()
+        entry_opcion.delete(0, tk.END)
+        
+        output.config(state='normal')
+        output.delete(1.0, tk.END)
+        
+        if opcion == "1":
+            # Almacenar temperaturas
+            ventana_temp = tk.Toplevel(self.root)
+            ventana_temp.title("Ingresar Temperaturas")
+            ventana_temp.geometry("400x400")
+            
+            frame_temp = tk.Frame(ventana_temp)
+            frame_temp.pack(fill='both', expand=True, padx=10, pady=10)
+            
+            self.temperaturas = []  # Reiniciar las temperaturas
+            
+            # Crear campos para cada día
+            self.entries_temp = []
+            for i, dia in enumerate(self.dias_semana):
+                tk.Label(frame_temp, text=f"Temperatura para {dia}:").grid(row=i, column=0, padx=5, pady=5)
+                entry = tk.Entry(frame_temp, width=10)
+                entry.grid(row=i, column=1, padx=5, pady=5)
+                self.entries_temp.append(entry)
+            
+            def guardar_temperaturas():
+                try:
+                    self.temperaturas = []
+                    for entry in self.entries_temp:
+                        temp = float(entry.get())
+                        self.temperaturas.append(temp)
+                    
+                    output.insert(tk.END, "Temperaturas almacenadas correctamente:\n")
+                    for dia, temp in zip(self.dias_semana, self.temperaturas):
+                        output.insert(tk.END, f"{dia}: {temp}°C\n")
+                    
+                    ventana_temp.destroy()
+                except ValueError:
+                    output.insert(tk.END, "Error: Ingrese valores numéricos válidos para todas las temperaturas\n")
+            
+            btn_guardar = tk.Button(frame_temp, text="Guardar", command=guardar_temperaturas)
+            btn_guardar.grid(row=len(self.dias_semana), column=0, columnspan=2, pady=10)
+            
+        elif opcion == "2":
+            # Mostrar temperaturas almacenadas
+            if not self.temperaturas:
+                output.insert(tk.END, "No hay temperaturas almacenadas. Use la opción 1 primero.\n")
+            else:
+                output.insert(tk.END, "Temperaturas almacenadas:\n")
+                for dia, temp in zip(self.dias_semana, self.temperaturas):
+                    output.insert(tk.END, f"{dia}: {temp}°C\n")
+        
+        elif opcion == "3":
+            # Identificar temperaturas únicas
+            if not self.temperaturas:
+                output.insert(tk.END, "No hay temperaturas almacenadas. Use la opción 1 primero.\n")
+            else:
+                temperaturas_unicas = list(set(self.temperaturas))
+                output.insert(tk.END, f"Temperaturas únicas: {temperaturas_unicas}\n")
+        
+        elif opcion == "4":
+            # Crear diccionario de temperaturas
+            if not self.temperaturas:
+                output.insert(tk.END, "No hay temperaturas almacenadas. Use la opción 1 primero.\n")
+            else:
+                diccionario_temp = dict(zip(self.dias_semana, self.temperaturas))
+                output.insert(tk.END, "Diccionario de temperaturas:\n")
+                for dia, temp in diccionario_temp.items():
+                    output.insert(tk.END, f"{dia}: {temp}°C\n")
+        
+        elif opcion == "5":
+            # Mostrar temperatura máxima y mínima
+            if not self.temperaturas:
+                output.insert(tk.END, "No hay temperaturas almacenadas. Use la opción 1 primero.\n")
+            else:
+                temp_max = max(self.temperaturas)
+                temp_min = min(self.temperaturas)
+                output.insert(tk.END, f"Temperatura máxima: {temp_max}°C\n")
+                output.insert(tk.END, f"Temperatura mínima: {temp_min}°C\n")
+        
+        elif opcion == "0":
+            output.insert(tk.END, "Saliendo del programa...\n")
+        else:
+            output.insert(tk.END, "Opción no válida, intente de nuevo.\n")
+        
+        output.insert(tk.END, "\nMenú de Opciones:")
+        output.insert(tk.END, "\n1. Almacenar temperaturas para la semana")
+        output.insert(tk.END, "\n2. Mostrar temperaturas almacenadas")
+        output.insert(tk.END, "\n3. Identificar las temperaturas únicas")
+        output.insert(tk.END, "\n4. Crear diccionario de temperaturas")
+        output.insert(tk.END, "\n5. Mostrar temperatura máxima y mínima")
+        output.insert(tk.END, "\n0. Salir\n")
+        output.config(state='disabled')
     
     def procesar_opcion_temperaturas(self, entry_opcion, output):
         opcion = entry_opcion.get()
@@ -2469,11 +2579,418 @@ if __name__ == '__main__':
             os.remove(imagen_path.replace('.png', ''))
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo generar la visualización: {str(e)}")
+
+
+
+
+
     def agregar_salida_recursividad(self, texto):
         self.output_recursividad.config(state='normal')
         self.output_recursividad.insert(tk.END, texto + "\n")
         self.output_recursividad.config(state='disabled')
         self.output_recursividad.see(tk.END)
+    def ejecutar_concurrencia(self):
+        if self.ventana_comcurrencia is None or not self.ventana_comcurrencia.winfo_exists():
+            self.ventana_comcurrencia = tk.Toplevel(self.root)
+            self.ventana_comcurrencia.title("Simulación de Concurrencia - Dulcería CP")
+            self.ventana_comcurrencia.geometry("800x600")
+            
+            frame = tk.Frame(self.ventana_comcurrencia)
+            frame.pack(fill='both', expand=True, padx=20, pady=20)
+            
+            label = tk.Label(frame, text="Simulación de Concurrencia - Dulcería CP", font=('Arial', 14))
+            label.pack(pady=10)
+            
+            # Área de salida con scroll
+            self.output_concurrencia = scrolledtext.ScrolledText(frame, wrap=tk.WORD, 
+                                                            width=80, height=25, 
+                                                            font=('Consolas', 10))
+            self.output_concurrencia.pack(fill='both', expand=True)
+            
+            # Frame para controles
+            frame_controles = tk.Frame(frame)
+            frame_controles.pack(fill='x', pady=10)
+            
+            lbl_clientes = tk.Label(frame_controles, text="Número de clientes:")
+            lbl_clientes.pack(side='left')
+            
+            self.entry_clientes = tk.Entry(frame_controles, width=10)
+            self.entry_clientes.pack(side='left', padx=5)
+            self.entry_clientes.insert(0, "50")
+            
+            btn_iniciar = tk.Button(frame_controles, text="Iniciar Simulación", 
+                                command=self.iniciar_simulacion_concurrencia)
+            btn_iniciar.pack(side='left', padx=10)
+            
+            btn_limpiar = tk.Button(frame_controles, text="Limpiar", 
+                                command=lambda: self.output_concurrencia.delete(1.0, tk.END))
+            btn_limpiar.pack(side='left')
+            
+            # Mostrar código fuente
+            self.mostrar_codigo_concurrencia()
+        else:
+            self.ventana_comcurrencia.lift()
+    def iniciar_simulacion_concurrencia(self):
+        try:
+            total_clientes = int(self.entry_clientes.get())
+            if total_clientes <= 0:
+                messagebox.showerror("Error", "El número de clientes debe ser mayor que 0")
+                return
+                
+            self.output_concurrencia.delete(1.0, tk.END)
+            
+            def output_callback(text):
+                self.output_concurrencia.insert(tk.END, text + "\n")
+                self.output_concurrencia.see(tk.END)
+                self.output_concurrencia.update_idletasks()
+            
+            dulceria = DulceriaCP(output_callback)
+            
+            # Mostrar encabezado
+            self.output_concurrencia.insert(tk.END, "DULCERIA CP - SIMULACIÓN DE CONCURRENCIA\n")
+            self.output_concurrencia.insert(tk.END, f"Total de clientes: {total_clientes}\n")
+            self.output_concurrencia.insert(tk.END, "="*50 + "\n")
+            
+            # Función para ejecutar la simulación en un hilo separado
+            def ejecutar_simulacion():
+                # Hilo de llegada de clientes
+                productor = threading.Thread(target=dulceria.llegada_clientes, args=(total_clientes,))
+                productor.start()
+
+                # Hilos de cajas (6 cajas)
+                cajas = [
+                    threading.Thread(target=dulceria.caja, args=(i,))
+                    for i in range(1, 7)
+                ]
+
+                for c in cajas:
+                    c.start()
+
+                productor.join()
+                dulceria.cola_clientes.join()
+
+                for c in cajas:
+                    c.join()
+
+                self.output_concurrencia.insert(tk.END, "\nTodos los clientes fueron atendidos\n")
+                self.output_concurrencia.insert(tk.END, f"Total de clientes atendidos: {dulceria.atendidos}\n")
+                self.output_concurrencia.see(tk.END)
+            
+            # Iniciar la simulación en un hilo separado
+            threading.Thread(target=ejecutar_simulacion, daemon=True).start()
+            
+        except ValueError:
+            messagebox.showerror("Error", "Ingrese un número válido de clientes")
+    
+    def mostrar_codigo_concurrencia(self):
+        codigo = """class DulceriaCP:
+    def __init__(self):
+        self.cola_clientes = queue.Queue()
+        self.lock = threading.Lock()
+        self.sem = threading.Semaphore(4)
+        self.atendidos = 0
+
+    def llegada_clientes(self, total):
+        for i in range(1, total + 1):
+            time.sleep(random.uniform(0.5, 2))
+            cliente = f"Cliente-{i}"
+            self.cola_clientes.put(cliente)
+            with self.lock:
+                print(f" Llegó {cliente} (En cola: {self.cola_clientes.qsize()})")
+
+    def caja(self, numero):
+        while True:
+            try:
+                cliente = self.cola_clientes.get(timeout=2)
+            except queue.Empty:
+                break
+
+            if not self.sem.acquire(timeout=1):
+                with self.lock:
+                    print(f"[Caja-{numero}] No pudo atender a {cliente} (timeout)")
+                continue
+
+            try:
+                with self.lock:
+                    print(f"[Caja-{numero}] Atendiendo a {cliente}")
+                time.sleep(random.uniform(0.5, 1.0))  #Tiempo de atencion
+
+                with self.lock:
+                    self.atendidos += 1
+                    print(f"[Caja-{numero}] Terminó con {cliente} | Total atendidos: {self.atendidos}")
+            finally:
+                self.sem.release()
+                self.cola_clientes.task_done()
+
+if __name__ == "__main__":
+    dulceria = DulceriaCP()
+    total_clientes = 50
+
+    print("DULCERIA CP")
+    # Hilo de clientes papu
+    productor = threading.Thread(target=dulceria.llegada_clientes, args=(total_clientes,))
+    productor.start()
+
+    cajas = [
+        threading.Thread(target=dulceria.caja, args=(i,))
+        for i in range(1, 7)
+    ]
+
+    for c in cajas:
+        c.start()
+
+    productor.join()
+    dulceria.cola_clientes.join()
+
+    for c in cajas:
+        c.join()
+
+    print("\\nTodos los clientes fueron atendidos")
+    print(f"Total de clientes atendidos: {dulceria.atendidos}")"""
+        
+        frame_codigo = tk.Frame(self.output_concurrencia.master)
+        frame_codigo.pack(fill='x', pady=10)
+        
+        lbl_codigo = tk.Label(frame_codigo, text="Código Fuente:", font=('Arial', 10, 'bold'))
+        lbl_codigo.pack(anchor='w')
+        
+        text_codigo = scrolledtext.ScrolledText(frame_codigo, wrap=tk.WORD, 
+                                              width=80, height=15, 
+                                              font=('Courier', 9), bg='#f0f0f0')
+        text_codigo.pack(fill='x')
+        text_codigo.insert(tk.END, codigo)
+        text_codigo.config(state='disabled')
+    
+    def agregar_salida_concurrencia(self, texto):
+        self.output_concurrencia.config(state='normal')
+        self.output_concurrencia.insert(tk.END, texto + "\n")
+        self.output_concurrencia.config(state='disabled')
+        self.output_concurrencia.see(tk.END)
+        
+        # También mostrar en la salida estándar capturada
+        print(texto)
+    
+    def limpiar_salida_concurrencia(self):
+        self.output_concurrencia.config(state='normal')
+        self.output_concurrencia.delete(1.0, tk.END)
+        self.output_concurrencia.config(state='disabled')
+        self.mystdout = StringIO()  # Limpiar el buffer de salida
+    
+    def ejecutar_concurrencia(self):
+        # Crear ventana de selección
+        ventana_seleccion = tk.Toplevel(self.root)
+        ventana_seleccion.title("Seleccionar Simulación de Concurrencia")
+        ventana_seleccion.geometry("400x200")
+        
+        label = tk.Label(ventana_seleccion, text="Seleccione el tipo de simulación:", font=('Arial', 12))
+        label.pack(pady=20)
+        
+        btn_dulceria = tk.Button(ventana_seleccion, text="Dulcería CP (Colas)", 
+                                command=self.mostrar_simulacion_dulceria,
+                                font=('Arial', 12), bg='lightblue')
+        btn_dulceria.pack(pady=10)
+        
+        btn_problemas = tk.Button(ventana_seleccion, text="Problemas de Concurrencia", 
+                                command=self.mostrar_problemas_concurrencia,
+                                font=('Arial', 12), bg='lightgreen')
+        btn_problemas.pack(pady=10)
+
+    def mostrar_simulacion_dulceria(self):
+        if self.ventana_comcurrencia is None or not self.ventana_comcurrencia.winfo_exists():
+            self.ventana_comcurrencia = tk.Toplevel(self.root)
+            self.ventana_comcurrencia.title("Simulación de Concurrencia - Dulcería CP")
+            self.ventana_comcurrencia.geometry("800x600")
+            
+            frame = tk.Frame(self.ventana_comcurrencia)
+            frame.pack(fill='both', expand=True, padx=20, pady=20)
+            
+            label = tk.Label(frame, text="Simulación de Concurrencia - Dulcería CP", font=('Arial', 14))
+            label.pack(pady=10)
+            
+            # Área de salida con scroll
+            self.output_concurrencia = scrolledtext.ScrolledText(frame, wrap=tk.WORD, 
+                                                            width=80, height=25, 
+                                                            font=('Consolas', 10))
+            self.output_concurrencia.pack(fill='both', expand=True)
+            
+            # Frame para controles
+            frame_controles = tk.Frame(frame)
+            frame_controles.pack(fill='x', pady=10)
+            
+            lbl_clientes = tk.Label(frame_controles, text="Número de clientes:")
+            lbl_clientes.pack(side='left')
+            
+            self.entry_clientes = tk.Entry(frame_controles, width=10)
+            self.entry_clientes.pack(side='left', padx=5)
+            self.entry_clientes.insert(0, "50")
+            
+            btn_iniciar = tk.Button(frame_controles, text="Iniciar Simulación", 
+                                command=self.iniciar_simulacion_concurrencia)
+            btn_iniciar.pack(side='left', padx=10)
+            
+            btn_limpiar = tk.Button(frame_controles, text="Limpiar", 
+                                command=lambda: self.output_concurrencia.delete(1.0, tk.END))
+            btn_limpiar.pack(side='left')
+            
+            # Mostrar código fuente
+            self.mostrar_codigo_concurrencia()
+        else:
+            self.ventana_comcurrencia.lift()
+
+    def mostrar_problemas_concurrencia(self):
+        if not hasattr(self, 'ventana_problemas_concurrencia') or not self.ventana_problemas_concurrencia.winfo_exists():
+            self.ventana_problemas_concurrencia = tk.Toplevel(self.root)
+            self.ventana_problemas_concurrencia.title("Problemas de Concurrencia")
+            self.ventana_problemas_concurrencia.geometry("800x600")
+            
+            frame = tk.Frame(self.ventana_problemas_concurrencia)
+            frame.pack(fill='both', expand=True, padx=20, pady=20)
+            
+            label = tk.Label(frame, text="Simulación de Problemas de Concurrencia", font=('Arial', 14))
+            label.pack(pady=10)
+            
+            # Área de salida con scroll
+            self.output_problemas = scrolledtext.ScrolledText(frame, wrap=tk.WORD, 
+                                                         width=80, height=25, 
+                                                         font=('Consolas', 10))
+            self.output_problemas.pack(fill='both', expand=True)
+            
+            # Frame para controles
+            frame_controles = tk.Frame(frame)
+            frame_controles.pack(fill='x', pady=10)
+            
+            btn_carrera = tk.Button(frame_controles, text="Condición de Carrera", 
+                                 command=self.simular_carrera,
+                                 bg='lightcoral')
+            btn_carrera.pack(side='left', padx=5)
+            
+            btn_deadlock = tk.Button(frame_controles, text="Deadlock", 
+                                  command=self.simular_deadlock,
+                                  bg='lightblue')
+            btn_deadlock.pack(side='left', padx=5)
+            
+            btn_starvation = tk.Button(frame_controles, text="Starvation", 
+                                    command=self.simular_starvation,
+                                    bg='lightgreen')
+            btn_starvation.pack(side='left', padx=5)
+            
+            btn_limpiar = tk.Button(frame_controles, text="Limpiar", 
+                                 command=lambda: self.output_problemas.delete(1.0, tk.END))
+            btn_limpiar.pack(side='left', padx=5)
+            
+            # Mostrar código fuente
+            self.mostrar_codigo_problemas()
+        else:
+            self.ventana_problemas_concurrencia.lift()
+
+    def simular_carrera(self):
+        self.output_problemas.insert(tk.END, "Iniciando simulación de condición de carrera...\n")
+        self.output_problemas.insert(tk.END, "20 clientes llegarán a 3 cajas simultáneamente\n\n")
+        
+        # Crear una instancia de DulceriaGUI para manejar la simulación
+        self.dulceria_gui = DulceriaGUI()
+        
+        # Ejecutar la simulación en un hilo separado
+        threading.Thread(target=self.dulceria_gui.simular_carrera, 
+                        args=(self.output_problemas,), 
+                        daemon=True).start()
+
+    def simular_deadlock(self):
+        self.output_problemas.insert(tk.END, "Iniciando simulación de deadlock...\n")
+        self.output_problemas.insert(tk.END, "Dos cajas intentarán adquirir locks en orden inverso\n\n")
+        
+        self.dulceria_gui = DulceriaGUI()
+        threading.Thread(target=self.dulceria_gui.simular_deadlock, 
+                        args=(self.output_problemas,), 
+                        daemon=True).start()
+
+    def simular_starvation(self):
+        self.output_problemas.insert(tk.END, "Iniciando simulación de starvation...\n")
+        self.output_problemas.insert(tk.END, "Una caja con prioridad monopolizará el semáforo\n\n")
+        
+        self.dulceria_gui = DulceriaGUI()
+        threading.Thread(target=self.dulceria_gui.simular_starvation, 
+                        args=(self.output_problemas,), 
+                        daemon=True).start()
+
+    def mostrar_codigo_problemas(self):
+        codigo = """class DulceriaGUI:
+    def __init__(self):
+        self.atendidos = 0
+        self.lock = threading.Lock()
+        self.sem = threading.Semaphore(1)
+        self.cola = queue.Queue()
+
+    def simular_carrera(self, text_widget):
+        self.atendidos = 0
+        for i in range(20):
+            self.cola.put(f"Cliente {i+1}")
+
+        def caja(num):
+            while not self.cola.empty():
+                try:
+                    cliente = self.cola.get(timeout=1)
+                    text_widget.insert(tk.END, f"Caja {num} atiende a {cliente}\\n")
+                    time.sleep(random.uniform(0.1, 0.3))
+                    with self.lock:
+                        self.atendidos += 1
+                except queue.Empty:
+                    break
+
+        for i in range(3):
+            threading.Thread(target=caja, args=(i+1,)).start()
+
+    def simular_deadlock(self, text_widget):
+        lockA = threading.Lock()
+        lockB = threading.Lock()
+
+        def caja1():
+            with lockA:
+                time.sleep(0.1)
+                with lockB:
+                    text_widget.insert(tk.END, "Caja 1 logró ambos locks\\n")
+
+        def caja2():
+            with lockB:
+                time.sleep(0.1)
+                with lockA:
+                    text_widget.insert(tk.END, "Caja 2 logró ambos locks\\n")
+
+        threading.Thread(target=caja1).start()
+        threading.Thread(target=caja2).start()
+
+    def simular_starvation(self, text_widget):
+        def prioridad():
+            while True:
+                with self.sem:
+                    text_widget.insert(tk.END, "[PRIORIDAD] atendiendo...\\n")
+                    time.sleep(0.1)
+
+        def normal(nombre):
+            while True:
+                with self.sem:
+                    text_widget.insert(tk.END, f"[{nombre}] atendiendo...\\n")
+                    time.sleep(0.5)
+
+        threading.Thread(target=prioridad, daemon=True).start()
+        threading.Thread(target=normal, args=("Caja 2",), daemon=True).start()
+        threading.Thread(target=normal, args=("Caja 3",), daemon=True).start()"""
+        
+        frame_codigo = tk.Frame(self.output_problemas.master)
+        frame_codigo.pack(fill='x', pady=10)
+        
+        lbl_codigo = tk.Label(frame_codigo, text="Código Fuente:", font=('Arial', 10, 'bold'))
+        lbl_codigo.pack(anchor='w')
+        
+        text_codigo = scrolledtext.ScrolledText(frame_codigo, wrap=tk.WORD, 
+                                              width=80, height=15, 
+                                              font=('Courier', 9), bg='#f0f0f0')
+        text_codigo.pack(fill='x')
+        text_codigo.insert(tk.END, codigo)
+        text_codigo.config(state='disabled')
+
+
+
 """
     # Métodos para grafos (senderismo)
     def inicializar_grafo_senderismo(self):
@@ -2620,7 +3137,113 @@ if __name__ == '__main__':
         self.output_grafos.see(tk.END)
 """
 
+class DulceriaCP:
+    def __init__(self, output_callback=None):
+        self.cola_clientes = queue.Queue()
+        self.lock = threading.Lock()
+        self.sem = threading.Semaphore(4)
+        self.atendidos = 0
+        self.output_callback=output_callback
+    
+    def print(self, text):
+        if self.output_callback:
+            self.output_callback(text)
+        else:
+            print(text)
 
+
+    def llegada_clientes(self, total):
+        for i in range(1, total + 1):
+            time.sleep(random.uniform(0.5, 2))
+            cliente = f"Cliente-{i}"
+            self.cola_clientes.put(cliente)
+            with self.lock:
+                print(f" Llegó {cliente} (En cola: {self.cola_clientes.qsize()})")
+
+    def caja(self, numero):
+        while True:
+            try:
+                cliente = self.cola_clientes.get(timeout=2)
+            except queue.Empty:
+                break
+
+            if not self.sem.acquire(timeout=1):
+                with self.lock:
+                    print(f"[Caja-{numero}] No pudo atender a {cliente} (timeout)")
+                continue
+
+            try:
+                with self.lock:
+                    print(f"[Caja-{numero}] Atendiendo a {cliente}")
+                time.sleep(random.uniform(0.5, 1.0))  #Tiempo de atencion
+
+                with self.lock:
+                    self.atendidos += 1
+                    print(f"[Caja-{numero}] Terminó con {cliente} | Total atendidos: {self.atendidos}")
+            finally:
+                self.sem.release()
+                self.cola_clientes.task_done()
+class DulceriaGUI:
+    def __init__(self):
+        self.atendidos = 0
+        self.lock = threading.Lock()
+        self.sem = threading.Semaphore(1)
+        self.cola = queue.Queue()
+
+    def simular_carrera(self, text_widget):
+        self.atendidos = 0
+        for i in range(20):
+            self.cola.put(f"Cliente {i+1}")
+
+        def caja(num):
+            while not self.cola.empty():
+                try:
+                    cliente = self.cola.get(timeout=1)
+                    text_widget.insert(tk.END, f"Caja {num} atiende a {cliente}\n")
+                    time.sleep(random.uniform(0.1, 0.3))
+                    with self.lock:
+                        self.atendidos += 1
+                except queue.Empty:
+                    break
+
+        for i in range(3):
+            threading.Thread(target=caja, args=(i+1,)).start()
+
+    def simular_deadlock(self, text_widget):
+        lockA = threading.Lock()
+        lockB = threading.Lock()
+
+        def caja1():
+            with lockA:
+                time.sleep(0.1)
+                with lockB:
+                    text_widget.insert(tk.END, "Caja 1 logró ambos locks\n")
+
+        def caja2():
+            with lockB:
+                time.sleep(0.1)
+                with lockA:
+                    text_widget.insert(tk.END, "Caja 2 logró ambos locks\n")
+
+        threading.Thread(target=caja1).start()
+        threading.Thread(target=caja2).start()
+
+    def simular_starvation(self, text_widget):
+        def prioridad():
+            while True:
+                with self.sem:
+                    text_widget.insert(tk.END, "[PRIORIDAD] atendiendo...\n")
+                    time.sleep(0.1)
+
+        def normal(nombre):
+            while True:
+                with self.sem:
+                    text_widget.insert(tk.END, f"[{nombre}] atendiendo...\n")
+                    time.sleep(0.5)
+
+        threading.Thread(target=prioridad, daemon=True).start()
+        threading.Thread(target=normal, args=("Caja 2",), daemon=True).start()
+        threading.Thread(target=normal, args=("Caja 3",), daemon=True).start()
 
 if __name__ == "__main__":
     root = tk.Tk()

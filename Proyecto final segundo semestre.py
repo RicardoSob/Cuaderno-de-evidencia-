@@ -7,6 +7,7 @@ import queue
 import time
 import random
 from io import StringIO
+from datetime import datetime
 """
 from networkx import nx
 import graphviz import Digraph
@@ -2630,6 +2631,7 @@ if __name__ == '__main__':
             self.mostrar_codigo_concurrencia()
         else:
             self.ventana_comcurrencia.lift()
+
     def iniciar_simulacion_concurrencia(self):
         try:
             total_clientes = int(self.entry_clientes.get())
@@ -2680,8 +2682,7 @@ if __name__ == '__main__':
             threading.Thread(target=ejecutar_simulacion, daemon=True).start()
             
         except ValueError:
-            messagebox.showerror("Error", "Ingrese un número válido de clientes")
-    
+            messagebox.showerror("Error", "Ingrese un número válido de clientes") 
     def mostrar_codigo_concurrencia(self):
         codigo = """class DulceriaCP:
     def __init__(self):
@@ -2780,7 +2781,7 @@ if __name__ == "__main__":
         # Crear ventana de selección
         ventana_seleccion = tk.Toplevel(self.root)
         ventana_seleccion.title("Seleccionar Simulación de Concurrencia")
-        ventana_seleccion.geometry("400x200")
+        ventana_seleccion.geometry("400x250")
         
         label = tk.Label(ventana_seleccion, text="Seleccione el tipo de simulación:", font=('Arial', 12))
         label.pack(pady=20)
@@ -2790,9 +2791,14 @@ if __name__ == "__main__":
                                 font=('Arial', 12), bg='lightblue')
         btn_dulceria.pack(pady=10)
         
+        btn_cine = tk.Button(ventana_seleccion, text="Taquillas de Cine", 
+                            command=self.mostrar_simulacion_cine,
+                            font=('Arial', 12), bg='lightgreen')
+        btn_cine.pack(pady=10)
+        
         btn_problemas = tk.Button(ventana_seleccion, text="Problemas de Concurrencia", 
                                 command=self.mostrar_problemas_concurrencia,
-                                font=('Arial', 12), bg='lightgreen')
+                                font=('Arial', 12), bg='lightcoral')
         btn_problemas.pack(pady=10)
 
     def mostrar_simulacion_dulceria(self):
@@ -2988,7 +2994,268 @@ if __name__ == "__main__":
         text_codigo.pack(fill='x')
         text_codigo.insert(tk.END, codigo)
         text_codigo.config(state='disabled')
+    def mostrar_simulacion_cine(self):
+        if not hasattr(self, 'ventana_cine') or not self.ventana_cine.winfo_exists():
+            self.ventana_cine = tk.Toplevel(self.root)
+            self.ventana_cine.title("Simulación Concurrente de Taquillas de Cine")
+            self.ventana_cine.geometry("1000x700")
+            
+            # Variables de estado
+            self.taquillas_activas = 0
+            self.max_taquillas = 5
+            self.clientes_atendidos = 0
+            self.ingresos_totales = 0.0
+            self.simulacion_activa = False
+            self.cola_clientes = queue.Queue()
+            self.log_queue = queue.Queue()
+            self.total_clientes_generados = 0
+            self.clientes_a_generar = 0
+            self.tiempo_entre_clientes = 1.0
+            
+            # Crear interfaz
+            self.crear_interfaz_cine()
+            
+            # Hilo para actualizar la interfaz
+            self.actualizar_interfaz_thread = threading.Thread(target=self.actualizar_interfaz_cine, daemon=True)
+            self.actualizar_interfaz_thread.start()
+        else:
+            self.ventana_cine.lift()
 
+    def crear_interfaz_cine(self):
+        # Frame principal
+        main_frame = ttk.Frame(self.ventana_cine, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Sección de configuración
+        config_frame = ttk.LabelFrame(main_frame, text="Configuración de Simulación", padding="10")
+        config_frame.pack(fill=tk.X, pady=5)
+        
+        # Control de cantidad de clientes
+        ttk.Label(config_frame, text="Total de clientes a generar:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+        self.clientes_entry = ttk.Entry(config_frame)
+        self.clientes_entry.insert(0, "50")
+        self.clientes_entry.grid(row=0, column=1, padx=5, pady=5)
+        
+        # Control de tiempo entre clientes
+        ttk.Label(config_frame, text="Tiempo entre llegadas (segundos):").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
+        self.tiempo_entry = ttk.Entry(config_frame)
+        self.tiempo_entry.insert(0, "1.0")
+        self.tiempo_entry.grid(row=1, column=1, padx=5, pady=5)
+        
+        # Control de cantidad de taquillas
+        ttk.Label(config_frame, text="Número de taquillas:").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
+        self.taquillas_entry = ttk.Entry(config_frame)
+        self.taquillas_entry.insert(0, "5")
+        self.taquillas_entry.grid(row=2, column=1, padx=5, pady=5)
+        
+        # Sección de control
+        control_frame = ttk.LabelFrame(main_frame, text="Control de Simulación", padding="10")
+        control_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Button(control_frame, text="Iniciar Simulación", command=self.iniciar_simulacion_cine).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Detener Simulación", command=self.detener_simulacion_cine).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Agregar 10 clientes", command=lambda: self.agregar_clientes_cine(10)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Reiniciar", command=self.reiniciar_simulacion_cine).pack(side=tk.RIGHT, padx=5)
+        
+        # Sección de estado
+        estado_frame = ttk.LabelFrame(main_frame, text="Estado del Sistema", padding="10")
+        estado_frame.pack(fill=tk.X, pady=5)
+        
+        self.taquillas_label = ttk.Label(estado_frame, text="Taquillas activas: 0/5")
+        self.taquillas_label.pack(anchor=tk.W)
+        
+        self.clientes_label = ttk.Label(estado_frame, text="Clientes atendidos: 0")
+        self.clientes_label.pack(anchor=tk.W)
+        
+        self.clientes_generados_label = ttk.Label(estado_frame, text="Clientes generados: 0/0")
+        self.clientes_generados_label.pack(anchor=tk.W)
+        
+        self.ingresos_label = ttk.Label(estado_frame, text="Ingresos totales: $0.00")
+        self.ingresos_label.pack(anchor=tk.W)
+        
+        # Sección de registro
+        registro_frame = ttk.LabelFrame(main_frame, text="Registro de Eventos", padding="10")
+        registro_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.registro_text = tk.Text(registro_frame, height=15, state=tk.DISABLED)
+        self.registro_text.pack(fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(registro_frame, command=self.registro_text.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.registro_text.config(yscrollcommand=scrollbar.set)
+        
+        # Sección de estadísticas
+        stats_frame = ttk.LabelFrame(main_frame, text="Estadísticas", padding="10")
+        stats_frame.pack(fill=tk.X, pady=5)
+        
+        self.tiempo_promedio_label = ttk.Label(stats_frame, text="Tiempo promedio de atención: 0.00s")
+        self.tiempo_promedio_label.pack(anchor=tk.W)
+        
+        self.clientes_espera_label = ttk.Label(stats_frame, text="Clientes en espera: 0")
+        self.clientes_espera_label.pack(anchor=tk.W)
+        
+        self.tiempo_restante_label = ttk.Label(stats_frame, text="Tiempo estimado restante: 0.00s")
+        self.tiempo_restante_label.pack(anchor=tk.W)
+
+    def iniciar_simulacion_cine(self):
+        if self.simulacion_activa:
+            messagebox.showwarning("Advertencia", "La simulación ya está en ejecución.")
+            return
+        
+        try:
+            self.clientes_a_generar = int(self.clientes_entry.get())
+            self.tiempo_entre_clientes = float(self.tiempo_entry.get())
+            self.max_taquillas = int(self.taquillas_entry.get())
+            
+            if self.clientes_a_generar <= 0 or self.tiempo_entre_clientes <= 0 or self.max_taquillas <= 0:
+                raise ValueError("Los valores deben ser mayores a cero")
+                
+        except ValueError as e:
+            messagebox.showerror("Error", f"Valores inválidos: {str(e)}")
+            return
+        
+        self.simulacion_activa = True
+        self.taquillas_activas = 0
+        self.clientes_atendidos = 0
+        self.total_clientes_generados = 0
+        self.ingresos_totales = 0.0
+        
+        # Limpiar la cola de clientes
+        with self.cola_clientes.mutex:
+            self.cola_clientes.queue.clear()
+        
+        # Limpiar el registro
+        self.registro_text.config(state=tk.NORMAL)
+        self.registro_text.delete(1.0, tk.END)
+        self.registro_text.config(state=tk.DISABLED)
+        
+        # Iniciar hilo para generar clientes
+        threading.Thread(target=self.generar_clientes_cine, daemon=True).start()
+        
+        # Iniciar taquillas
+        for i in range(1, self.max_taquillas + 1):
+            threading.Thread(target=self.atender_clientes_cine, args=(i,), daemon=True).start()
+        
+        self.log_evento_cine(f"Simulación iniciada con {self.max_taquillas} taquillas")
+        self.log_evento_cine(f"Generando {self.clientes_a_generar} clientes con intervalo de {self.tiempo_entre_clientes}s")
+
+    def detener_simulacion_cine(self):
+        if not self.simulacion_activa:
+            messagebox.showwarning("Advertencia", "La simulación no está en ejecución.")
+            return
+        
+        self.simulacion_activa = False
+        self.log_evento_cine("Simulación detenida por el usuario")
+
+    def reiniciar_simulacion_cine(self):
+        self.detener_simulacion_cine()
+        time.sleep(0.5)  # Esperar a que los hilos se detengan
+        self.iniciar_simulacion_cine()
+
+    def agregar_clientes_cine(self, cantidad):
+        if not self.simulacion_activa:
+            messagebox.showwarning("Advertencia", "La simulación no está en ejecución.")
+            return
+        
+        self.clientes_a_generar += cantidad
+        self.log_evento_cine(f"Se agregaron {cantidad} clientes a la simulación (Total: {self.clientes_a_generar})")
+
+    def generar_clientes_cine(self):
+        while self.simulacion_activa and self.total_clientes_generados < self.clientes_a_generar:
+            tiempo_espera = self.tiempo_entre_clientes
+            time.sleep(tiempo_espera)
+            
+            if not self.simulacion_activa:
+                break
+                
+            # Crear un nuevo cliente
+            self.total_clientes_generados += 1
+            cliente_id = self.total_clientes_generados
+            boletos = random.randint(1, 5)
+            tipo_boleto = random.choice(["General", "Niño", "Tercera Edad"])
+            
+            self.cola_clientes.put({
+                'id': cliente_id,
+                'boletos': boletos,
+                'tipo': tipo_boleto,
+                'hora_llegada': datetime.now()
+            })
+            
+            self.log_evento_cine(f"Cliente {cliente_id} llegó a la cola (Boletos: {boletos}, Tipo: {tipo_boleto})")
+        
+        if self.total_clientes_generados >= self.clientes_a_generar:
+            self.log_evento_cine(f"Se han generado todos los clientes programados ({self.clientes_a_generar})")
+
+    def atender_clientes_cine(self, taquilla_id):
+        while self.simulacion_activa:
+            try:
+                # Intentar obtener un cliente de la cola (con timeout para no bloquear indefinidamente)
+                cliente = self.cola_clientes.get(timeout=1)
+                
+                self.taquillas_activas += 1
+                self.log_evento_cine(f"[Taquilla-{taquilla_id}] Atendiendo a Cliente-{cliente['id']}")
+                
+                # Simular tiempo de atención
+                tiempo_atencion = random.uniform(1.0, 3.0)
+                time.sleep(tiempo_atencion)
+                
+                # Calcular costo
+                if cliente['tipo'] == "General":
+                    precio = 75.0
+                elif cliente['tipo'] == "Niño":
+                    precio = 50.0
+                else:  # Tercera Edad
+                    precio = 45.0
+                
+                costo_total = cliente['boletos'] * precio
+                self.ingresos_totales += costo_total
+                self.clientes_atendidos += 1
+                
+                # Registrar finalización
+                tiempo_espera = (datetime.now() - cliente['hora_llegada']).total_seconds()
+                self.log_evento_cine(
+                    f"[Taquilla-{taquilla_id}] Terminó con Cliente-{cliente['id']} "
+                    f"(Tiempo: {tiempo_espera:.2f}s, Costo: ${costo_total:.2f})"
+                )
+                
+                self.taquillas_activas -= 1
+                self.cola_clientes.task_done()
+                
+            except queue.Empty:
+                # No hay clientes en la cola
+                continue
+
+    def log_evento_cine(self, mensaje):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.log_queue.put(f"[{timestamp}] {mensaje}")
+
+    def actualizar_interfaz_cine(self):
+        tiempos_atencion = []
+        
+        while True:
+            # Actualizar estadísticas
+            self.taquillas_label.config(text=f"Taquillas activas: {self.taquillas_activas}/{self.max_taquillas}")
+            self.clientes_label.config(text=f"Clientes atendidos: {self.clientes_atendidos}")
+            self.clientes_generados_label.config(text=f"Clientes generados: {self.total_clientes_generados}/{self.clientes_a_generar}")
+            self.ingresos_label.config(text=f"Ingresos totales: ${self.ingresos_totales:.2f}")
+            self.clientes_espera_label.config(text=f"Clientes en espera: {self.cola_clientes.qsize()}")
+            
+            # Calcular tiempo estimado restante
+            if self.taquillas_activas > 0 and self.cola_clientes.qsize() > 0:
+                tiempo_promedio_atencion = 2.0  # Valor promedio estimado
+                clientes_restantes = self.clientes_a_generar - self.clientes_atendidos
+                tiempo_restante = (clientes_restantes * tiempo_promedio_atencion) / self.max_taquillas
+                self.tiempo_restante_label.config(text=f"Tiempo estimado restante: {tiempo_restante:.2f}s")
+            
+            # Procesar mensajes del log
+            while not self.log_queue.empty():
+                mensaje = self.log_queue.get()
+                self.registro_text.config(state=tk.NORMAL)
+                self.registro_text.insert(tk.END, mensaje + "\n")
+                self.registro_text.config(state=tk.DISABLED)
+                self.registro_text.see(tk.END)
+            
+            time.sleep(0.1)
 
 
 """
@@ -3143,14 +3410,14 @@ class DulceriaCP:
         self.lock = threading.Lock()
         self.sem = threading.Semaphore(4)
         self.atendidos = 0
-        self.output_callback=output_callback
+        self.output_callback = output_callback
     
     def print(self, text):
+        """Método para mostrar texto en la salida designada"""
         if self.output_callback:
             self.output_callback(text)
         else:
             print(text)
-
 
     def llegada_clientes(self, total):
         for i in range(1, total + 1):
@@ -3158,7 +3425,7 @@ class DulceriaCP:
             cliente = f"Cliente-{i}"
             self.cola_clientes.put(cliente)
             with self.lock:
-                print(f" Llegó {cliente} (En cola: {self.cola_clientes.qsize()})")
+                self.print(f" Llegó {cliente} (En cola: {self.cola_clientes.qsize()})")
 
     def caja(self, numero):
         while True:
@@ -3169,17 +3436,17 @@ class DulceriaCP:
 
             if not self.sem.acquire(timeout=1):
                 with self.lock:
-                    print(f"[Caja-{numero}] No pudo atender a {cliente} (timeout)")
+                    self.print(f"[Caja-{numero}] No pudo atender a {cliente} (timeout)")
                 continue
 
             try:
                 with self.lock:
-                    print(f"[Caja-{numero}] Atendiendo a {cliente}")
-                time.sleep(random.uniform(0.5, 1.0))  #Tiempo de atencion
+                    self.print(f"[Caja-{numero}] Atendiendo a {cliente}")
+                time.sleep(random.uniform(0.5, 1.0))  # Tiempo de atención
 
                 with self.lock:
                     self.atendidos += 1
-                    print(f"[Caja-{numero}] Terminó con {cliente} | Total atendidos: {self.atendidos}")
+                    self.print(f"[Caja-{numero}] Terminó con {cliente} | Total atendidos: {self.atendidos}")
             finally:
                 self.sem.release()
                 self.cola_clientes.task_done()

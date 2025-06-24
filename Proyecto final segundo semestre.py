@@ -8,6 +8,7 @@ import time
 import random
 from io import StringIO
 from datetime import datetime
+from tkinter import Tk, simpledialog, messagebox 
 """
 from networkx import nx
 import graphviz import Digraph
@@ -3256,7 +3257,227 @@ if __name__ == "__main__":
                 self.registro_text.see(tk.END)
             
             time.sleep(0.1)
+    def mostrar_arboles_binarios(self):
+        if not hasattr(self, 'ventana_arboles') or not self.ventana_arboles.winfo_exists():
+            self.ventana_arboles = tk.Toplevel(self.root)
+            self.ventana_arboles.title("Árbol Binario de Estudiantes")
+            self.ventana_arboles.geometry("800x600")
+            
+            # Crear el árbol de estudiantes
+            self.arbol_estudiantes = ArbolEstudiante()
+            
+            # Insertar algunos datos de ejemplo
+            estudiantes_ejemplo = [
+                ("20230001", "Pérez Juan", 8.5, 7.8, 9.2),
+                ("20230002", "Gómez María", 7.0, 8.5, 9.0),
+                ("20230003", "López Carlos", 6.5, 7.0, 8.0),
+                ("20230004", "Martínez Ana", 9.0, 9.5, 8.5),
+                ("20230005", "Rodríguez Luis", 8.0, 7.5, 8.5)
+            ]
+            
+            for boleta, nombre, p1, p2, p3 in estudiantes_ejemplo:
+                self.arbol_estudiantes.insertar(boleta, nombre, p1, p2, p3)
+            
+            # Frame principal
+            main_frame = ttk.Frame(self.ventana_arboles, padding="10")
+            main_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Título
+            ttk.Label(main_frame, text="Árbol Binario de Estudiantes", 
+                     font=("Arial", 16, "bold")).grid(row=0, column=0, columnspan=2, pady=10)
+            
+            # Botones
+            btn_frame = ttk.Frame(main_frame)
+            btn_frame.grid(row=1, column=0, sticky=tk.NW, padx=5, pady=5)
+            
+            ttk.Button(btn_frame, text="Insertar Estudiante", 
+                      command=self.insertar_estudiante).pack(fill=tk.X, pady=2)
+            ttk.Button(btn_frame, text="Mostrar Recorridos", 
+                      command=self.mostrar_recorridos).pack(fill=tk.X, pady=2)
+            ttk.Button(btn_frame, text="Buscar Estudiante", 
+                      command=self.buscar_estudiante).pack(fill=tk.X, pady=2)
+            ttk.Button(btn_frame, text="Eliminar Estudiante", 
+                      command=self.eliminar_estudiante).pack(fill=tk.X, pady=2)
+            ttk.Button(btn_frame, text="Mostrar Profundidad", 
+                      command=self.mostrar_profundidad).pack(fill=tk.X, pady=2)
+            ttk.Button(btn_frame, text="Visualizar Árbol", 
+                      command=self.visualizar_arbol).pack(fill=tk.X, pady=2)
+            
+            # Área de texto para resultados
+            self.resultados_arbol = scrolledtext.ScrolledText(main_frame, width=60, height=20)
+            self.resultados_arbol.grid(row=1, column=1, sticky=tk.NSEW, padx=5, pady=5)
+            
+            # Configurar expansión de columnas/filas
+            main_frame.columnconfigure(1, weight=1)
+            main_frame.rowconfigure(1, weight=1)
+        else:
+            self.ventana_arboles.lift()
 
+    def insertar_estudiante(self):
+        # Crear ventana de diálogo para insertar estudiante
+        dialog = tk.Toplevel(self.ventana_arboles)
+        dialog.title("Insertar Estudiante")
+        dialog.geometry("400x300")
+        dialog.resizable(False, False)
+        
+        # Variables para los campos
+        boleta_var = tk.StringVar()
+        nombre_var = tk.StringVar()
+        p1_var = tk.StringVar()
+        p2_var = tk.StringVar()
+        p3_var = tk.StringVar()
+        
+        # Campos del formulario
+        ttk.Label(dialog, text="Boleta (8 dígitos):").pack(pady=(10, 0))
+        boleta_entry = ttk.Entry(dialog, textvariable=boleta_var)
+        boleta_entry.pack(pady=5)
+        
+        ttk.Label(dialog, text="Nombre (Apellido Nombre):").pack()
+        nombre_entry = ttk.Entry(dialog, textvariable=nombre_var)
+        nombre_entry.pack(pady=5)
+        
+        ttk.Label(dialog, text="Calificaciones (0-10):").pack()
+        
+        cal_frame = ttk.Frame(dialog)
+        cal_frame.pack(pady=5)
+        
+        ttk.Label(cal_frame, text="Parcial 1:").grid(row=0, column=0, padx=5)
+        p1_entry = ttk.Entry(cal_frame, textvariable=p1_var, width=5)
+        p1_entry.grid(row=0, column=1, padx=5)
+        
+        ttk.Label(cal_frame, text="Parcial 2:").grid(row=0, column=2, padx=5)
+        p2_entry = ttk.Entry(cal_frame, textvariable=p2_var, width=5)
+        p2_entry.grid(row=0, column=3, padx=5)
+        
+        ttk.Label(cal_frame, text="Parcial 3:").grid(row=0, column=4, padx=5)
+        p3_entry = ttk.Entry(cal_frame, textvariable=p3_var, width=5)
+        p3_entry.grid(row=0, column=5, padx=5)
+        
+        # Botón de inserción
+        def insertar():
+            try:
+                boleta = boleta_var.get()
+                nombre = nombre_var.get()
+                p1 = float(p1_var.get())
+                p2 = float(p2_var.get())
+                p3 = float(p3_var.get())
+                
+                if not boleta.isdigit() or len(boleta) != 8:
+                    messagebox.showerror("Error", "La boleta debe tener exactamente 8 dígitos numéricos")
+                    return
+                
+                if not all(0 <= x <= 10 for x in [p1, p2, p3]):
+                    messagebox.showerror("Error", "Las calificaciones deben estar entre 0 y 10")
+                    return
+                
+                if not nombre.strip():
+                    messagebox.showerror("Error", "El nombre no puede estar vacío")
+                    return
+                
+                # Verificar si la boleta ya existe
+                if self.arbol_estudiantes.buscar(boleta) is not None:
+                    messagebox.showerror("Error", "Ya existe un estudiante con esta boleta")
+                    return
+                
+                self.arbol_estudiantes.insertar(boleta, nombre, p1, p2, p3)
+                messagebox.showinfo("Éxito", "Estudiante insertado correctamente")
+                dialog.destroy()
+                
+            except ValueError:
+                messagebox.showerror("Error", "Por favor ingrese valores válidos para las calificaciones")
+        
+        ttk.Button(dialog, text="Insertar", command=insertar).pack(pady=10)
+        
+        # Centrar diálogo
+        dialog.transient(self.ventana_arboles)
+        dialog.grab_set()
+        self.ventana_arboles.wait_window(dialog)
+
+    def mostrar_recorridos(self):
+        if self.arbol_estudiantes.raiz is None:
+            messagebox.showwarning("Advertencia", "El árbol está vacío")
+            return
+        
+        self.resultados_arbol.delete(1.0, tk.END)
+        self.resultados_arbol.insert(tk.END, "=== RECORRIDOS DEL ÁRBOL ===\n\n")
+        
+        self.resultados_arbol.insert(tk.END, "Recorrido Inorden:\n")
+        inorden = self.arbol_estudiantes.inorden()
+        for item in inorden:
+            self.resultados_arbol.insert(tk.END, f"{item}\n")
+        
+        self.resultados_arbol.insert(tk.END, "\nRecorrido Preorden:\n")
+        preorden = self.arbol_estudiantes.preorden()
+        for item in preorden:
+            self.resultados_arbol.insert(tk.END, f"{item}\n")
+        
+        self.resultados_arbol.insert(tk.END, "\nRecorrido Postorden:\n")
+        postorden = self.arbol_estudiantes.postorden()
+        for item in postorden:
+            self.resultados_arbol.insert(tk.END, f"{item}\n")
+
+    def buscar_estudiante(self):
+        boleta = simpledialog.askstring("Buscar Estudiante", "Ingrese la boleta del estudiante:", parent=self.ventana_arboles)
+        if not boleta:
+            return
+            
+        estudiante = self.arbol_estudiantes.buscar(boleta)
+        
+        if estudiante:
+            info = (f"Boleta: {estudiante.boleta}\n"
+                   f"Nombre: {estudiante.nombre}\n"
+                   f"Parcial 1: {estudiante.parcial1}\n"
+                   f"Parcial 2: {estudiante.parcial2}\n"
+                   f"Parcial 3: {estudiante.parcial3}\n"
+                   f"Promedio: {estudiante.prom}")
+            
+            messagebox.showinfo("Estudiante Encontrado", info)
+        else:
+            messagebox.showinfo("No Encontrado", "No se encontró un estudiante con esa boleta")
+
+    def eliminar_estudiante(self):
+        boleta = simpledialog.askstring("Eliminar Estudiante", "Ingrese la boleta del estudiante a eliminar:", parent=self.ventana_arboles)
+        if not boleta:
+            return
+            
+        if self.arbol_estudiantes.buscar(boleta) is None:
+            messagebox.showinfo("No Encontrado", "No existe un estudiante con esa boleta")
+            return
+            
+        self.arbol_estudiantes.eliminar(boleta)
+        messagebox.showinfo("Éxito", "Estudiante eliminado correctamente")
+
+    def mostrar_profundidad(self):
+        profundidad = self.arbol_estudiantes.profundidad()
+        messagebox.showinfo("Profundidad del Árbol", f"La profundidad del árbol es: {profundidad}")
+
+    def visualizar_arbol(self):
+        if self.arbol_estudiantes.raiz is None:
+            messagebox.showwarning("Advertencia", "El árbol está vacío")
+            return
+            
+        try:
+            # Crear visualización con graphviz
+            dot = self.arbol_estudiantes.visualizar()
+            
+            # Guardar temporalmente la imagen
+            temp_dir = tempfile.mkdtemp()
+            file_path = os.path.join(temp_dir, "arbol")
+            dot.render(file_path, format='png', cleanup=True)
+            
+            # Mostrar la imagen en una nueva ventana
+            img_window = tk.Toplevel(self.ventana_arboles)
+            img_window.title("Visualización del Árbol")
+            
+            img = Image.open(file_path + ".png")
+            photo = ImageTk.PhotoImage(img)
+            
+            label = ttk.Label(img_window, image=photo)
+            label.image = photo  # Mantener referencia
+            label.pack()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo generar la visualización: {str(e)}")
 
 """
     # Métodos para grafos (senderismo)
@@ -3511,7 +3732,145 @@ class DulceriaGUI:
         threading.Thread(target=prioridad, daemon=True).start()
         threading.Thread(target=normal, args=("Caja 2",), daemon=True).start()
         threading.Thread(target=normal, args=("Caja 3",), daemon=True).start()
+class NodoEstudiante:
+    def __init__(self, boleta, nombre, parcial1, parcial2, parcial3):
+        self.boleta = boleta
+        self.nombre = nombre
+        self.parcial1 = parcial1
+        self.parcial2 = parcial2
+        self.parcial3 = parcial3
+        self.prom = round((parcial1 + parcial2 + parcial3) / 3, 2)
+        self.izq = None
+        self.der = None
 
+class ArbolEstudiante:
+    def __init__(self):
+        self.raiz = None
+
+    def insertar(self, boleta, nombre, parcial1, parcial2, parcial3):
+        if self.raiz is None:
+            self.raiz = NodoEstudiante(boleta, nombre, parcial1, parcial2, parcial3)
+        else:
+            self._insertar_recursivo(self.raiz, boleta, nombre, parcial1, parcial2, parcial3)
+
+    def _insertar_recursivo(self, nodo, boleta, nombre, parcial1, parcial2, parcial3):
+        if boleta < nodo.boleta:
+            if nodo.izq is None:
+                nodo.izq = NodoEstudiante(boleta, nombre, parcial1, parcial2, parcial3)
+            else:
+                self._insertar_recursivo(nodo.izq, boleta, nombre, parcial1, parcial2, parcial3)
+        elif boleta > nodo.boleta:
+            if nodo.der is None:
+                nodo.der = NodoEstudiante(boleta, nombre, parcial1, parcial2, parcial3)
+            else:
+                self._insertar_recursivo(nodo.der, boleta, nombre, parcial1, parcial2, parcial3)
+
+    def inorden(self):
+        return self._inorden_rec(self.raiz, [])
+
+    def _inorden_rec(self, nodo, lista):
+        if nodo is not None:
+            self._inorden_rec(nodo.izq, lista)
+            lista.append(f"{nodo.boleta} - {nodo.nombre} - Prom: {nodo.prom}")
+            self._inorden_rec(nodo.der, lista)
+        return lista
+
+    def preorden(self):
+        return self._preorden_rec(self.raiz, [])
+
+    def _preorden_rec(self, nodo, lista):
+        if nodo is not None:
+            lista.append(f"{nodo.boleta} - {nodo.nombre} - Prom: {nodo.prom}")
+            self._preorden_rec(nodo.izq, lista)
+            self._preorden_rec(nodo.der, lista)
+        return lista
+
+    def postorden(self):
+        return self._postorden_rec(self.raiz, [])
+
+    def _postorden_rec(self, nodo, lista):
+        if nodo is not None:
+            self._postorden_rec(nodo.izq, lista)
+            self._postorden_rec(nodo.der, lista)
+            lista.append(f"{nodo.boleta} - {nodo.nombre} - Prom: {nodo.prom}")
+        return lista
+
+    def buscar(self, boleta):
+        return self._buscar_rec(self.raiz, boleta)
+
+    def _buscar_rec(self, nodo, boleta):
+        if nodo is None:
+            return None
+        if nodo.boleta == boleta:
+            return nodo
+        elif boleta < nodo.boleta:
+            return self._buscar_rec(nodo.izq, boleta)
+        else:
+            return self._buscar_rec(nodo.der, boleta)
+
+    def eliminar(self, boleta):
+        self.raiz = self._eliminar_rec(self.raiz, boleta)
+
+    def _eliminar_rec(self, nodo, boleta):
+        if nodo is None:
+            return nodo
+
+        if boleta < nodo.boleta:
+            nodo.izq = self._eliminar_rec(nodo.izq, boleta)
+        elif boleta > nodo.boleta:
+            nodo.der = self._eliminar_rec(nodo.der, boleta)
+        else:
+            if nodo.izq is None:
+                return nodo.der
+            elif nodo.der is None:
+                return nodo.izq
+
+            temp = self._min_valor_nodo(nodo.der)
+            nodo.boleta = temp.boleta
+            nodo.nombre = temp.nombre
+            nodo.parcial1 = temp.parcial1
+            nodo.parcial2 = temp.parcial2
+            nodo.parcial3 = temp.parcial3
+            nodo.prom = temp.prom
+            nodo.der = self._eliminar_rec(nodo.der, temp.boleta)
+
+        return nodo
+
+    def _min_valor_nodo(self, nodo):
+        actual = nodo
+        while actual.izq is not None:
+            actual = actual.izq
+        return actual
+
+    def profundidad(self):
+        return self._profundidad_rec(self.raiz)
+
+    def _profundidad_rec(self, nodo):
+        if nodo is None:
+            return 0
+        else:
+            profundidad_izq = self._profundidad_rec(nodo.izq)
+            profundidad_der = self._profundidad_rec(nodo.der)
+            return max(profundidad_izq, profundidad_der) + 1
+
+    def visualizar(self):
+        punto = Digraph()
+        punto.attr('node', shape='rectangle')
+
+        if self.raiz is not None:
+            self._visualizar_rec(self.raiz, punto)
+        return punto
+
+    def _visualizar_rec(self, nodo, punto):
+        etiqueta = f"{nodo.boleta}\n{nodo.nombre}\nProm: {nodo.prom}"
+        punto.node(str(nodo.boleta), label=etiqueta)
+
+        if nodo.izq is not None:
+            punto.edge(str(nodo.boleta), str(nodo.izq.boleta))
+            self._visualizar_rec(nodo.izq, punto)
+        if nodo.der is not None:
+            punto.edge(str(nodo.boleta), str(nodo.der.boleta))
+            self._visualizar_rec(nodo.der, punto)
 if __name__ == "__main__":
     root = tk.Tk()
     app = CuadernoEvidencias(root)
